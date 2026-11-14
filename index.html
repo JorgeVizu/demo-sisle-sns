@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Listas de espera quirúrgica del SNS</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eef4f3;color:#142d2c;font:16px system-ui,sans-serif}header{background:#123633;color:white;padding:3rem max(5vw,1rem)}h1{margin:0;font-size:clamp(2rem,5vw,3.5rem)}header p{color:#c5e1dc}main{max-width:1100px;margin:auto;padding:1.5rem}section{margin-bottom:1.25rem;padding:1.25rem;background:white;border-radius:12px}button,select,input{font:inherit;margin:.25rem;padding:.55rem;border:1px solid #809f9a;border-radius:6px}button{background:#116059;color:white;cursor:pointer}button[aria-pressed=true]{outline:3px solid #123633;outline-offset:2px}.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1rem}.metrics strong{display:block;font-size:2rem;color:#116059}table{width:100%;border-collapse:collapse;text-align:left}td,th{padding:.6rem;border-bottom:1px solid #dce8e5}.scroll{overflow:auto}h2{margin-top:0}progress{width:100%;accent-color:#116059}a{color:#116059}
+</style>
+<header><h1>Listas de espera quirúrgica del SNS</h1><p>Datos oficiales SISLE-SNS · Cierre a 31 de diciembre de 2025</p></header>
+<main>
+<section><h2>Histórico de publicación</h2>
+<button id="first">Cargar publicación original</button>
+<button id="repeat">Reprocesar original</button>
+<button id="revision">Aplicar rectificación</button>
+<label>Importar resultado del validador <input id="import" type="file" accept=".json,application/json"></label>
+<p id="status" role="status"></p>
+<p>La rectificación de Castilla-La Mancha se publicó el 24 de septiembre de 2026. Ambas versiones corresponden al mismo periodo.</p>
+<div class="scroll"><table><thead><tr><th>Castilla-La Mancha</th><th>Pacientes en espera</th><th>Demora media</th></tr></thead><tbody id="history"></tbody></table></div>
+</section>
+<section><h2>Indicadores por territorio</h2>
+<label>Territorio <select id="territory"><option value="">Todos</option></select></label>
+<label>Ordenar por <select id="sort"><option value="patients">Pacientes</option><option value="days">Demora media</option></select></label>
+<div class="metrics" id="metrics"></div>
+<div class="scroll"><table><thead><tr><th>Territorio</th><th>Pacientes en espera</th><th>Demora media</th></tr></thead><tbody id="table"></tbody></table></div>
+</section>
+<section><h2>Fuentes</h2>
+<p>Totales territoriales de las tablas de las páginas 3 y 4. Los botones reproducen en el navegador el orden de carga de las publicaciones.</p>
+<ul>
+<li><a href="https://www.sanidad.gob.es/estadEstudios/estadisticas/inforRecopilaciones/docs/Datos_ccaa_dic2025.pdf">Publicación original</a></li>
+<li><a href="https://www.sanidad.gob.es/ca/estadEstudios/estadisticas/inforRecopilaciones/docs/Datos_ccaa_dic2025_rectificado.pdf">Publicación rectificada</a></li>
+<li><a href="https://vsf-iwsold-pro-portal.sanidad.gob.es/estadEstudios/estadisticas/inforRecopilaciones/docs/Nota_Aclaratoria_Rectificacion_Dic_2025.pdf">Nota oficial de rectificación</a></li>
+</ul></section></main>
+<script src="datos/sisle-web.js"></script>
+<script>
+const get = id => document.getElementById(id);
+const fmt = new Intl.NumberFormat("es-ES");
+const clm = original.find(row => row.code === "CLM");
+const corrected = {...clm, patients:36491, days:117};
+let revised = false;
+let imported = null;
+const territory = get("territory");
+const sort = get("sort");
+original.slice().sort((a,b) => a.name.localeCompare(b.name,"es")).forEach(row => territory.add(new Option(row.name,row.code)));
+function table(id, rows) {
+    const body = get(id);
+    body.replaceChildren();
+    for (const values of rows) {
+        const line = body.insertRow();
+        for (const value of values) line.insertCell().textContent = value;
+    }
+}
+function render() {
+    const rows = (imported?.rows ?? original.map(row => revised && row.code === "CLM" ? corrected : row))
+        .filter(row => !territory.value || row.code === territory.value)
+        .sort((a,b) => b[sort.value] - a[sort.value]);
+    table("table", rows.map(row => [row.name, fmt.format(row.patients), row.days + " días"]));
+    table("history", imported?.history ?? [
+        ["Publicación original", fmt.format(clm.patients), clm.days + " días"],
+        ...(revised ? [["Publicación rectificada",fmt.format(corrected.patients),corrected.days + " días"]] : [])
+    ]);
+    get("metrics").replaceChildren(...[
+        ["Pacientes en espera",fmt.format(rows.reduce((total,row) => total + row.patients,0))],
+        ["Territorios",rows.length],
+        ["Demora media",rows.length === 1 ? rows[0].days + " días" : (imported ? "—" : revised ? "122 días" : "121 días")]
+    ].map(([label,value]) => {
+        const metric = document.createElement("p");
+        const number = document.createElement("strong");
+        number.textContent = value;
+        metric.append(number,label);
+        return metric;
+    }));
+}
+function show(message) {
+    get("status").textContent = message;
+    render();
+}
+get("first").onclick = () => {
+    imported = null;
+    revised = false;
+    show("Recorrido reiniciado con la publicación original.");
+};
+get("repeat").onclick = () => imported ? show("El JSON importado permanece activo.") : show("Publicación original ya registrada. Se conservan las cifras vigentes.");
+get("revision").onclick = () => {
+    imported = null;
+    const message = revised ? "Rectificación ya registrada." : "Rectificación aplicada. Castilla-La Mancha suma 231 pacientes y 25 días de demora media.";
+    revised = true;
+    show(message);
+};
+get("import").onchange = async event => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+        const payload = JSON.parse(await file.text());
+        const rows = payload.deliveries.flatMap(delivery => delivery.rows);
+        const names = new Map(original.map(row => [row.code, row.name]));
+        const valid = rows.filter(row => row.reason === null && row.date === "2025-12-31");
+        if (!valid.length || valid.some(row => !names.has(row.territory) ||
+            !Number.isInteger(row.revision) || row.revision < 1 ||
+            !Number.isInteger(row.patients) || row.patients < 0 ||
+            !Number.isInteger(row.days) || row.days < 0)) throw new Error();
+        const latest = new Map();
+        for (const row of valid) {
+            if ((latest.get(row.territory)?.revision ?? 0) <= row.revision) latest.set(row.territory, row);
+        }
+        imported = {
+            rows: [...latest.values()].map(row => ({
+                code: row.territory, name: names.get(row.territory), patients: row.patients, days: row.days
+            })),
+            history: valid.filter(row => row.territory === "CLM").sort((a,b) => a.revision - b.revision)
+                .map(row => ["Revisión " + row.revision, fmt.format(row.patients), row.days + " días"])
+        };
+        territory.value = "";
+        show("JSON importado · " + latest.size + " territorios vigentes · " + valid.length +
+            " filas válidas del cierre · " + rows.filter(row => row.reason != null).length + " rechazos en el fichero.");
+    } catch {
+        get("status").textContent = "No se pudo importar el JSON del validador para el cierre de diciembre de 2025.";
+    } finally {
+        event.target.value = "";
+    }
+};
+territory.onchange = sort.onchange = render;
+show("Publicación original cargada.");
+</script>
+</html>
+
