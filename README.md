@@ -34,7 +34,11 @@ El cuadro local reproduce las dos publicaciones con una copia de las cifras. Sel
 
 ## Implantación propuesta
 
-SSIS recogería los CSV, ejecutaría el validador y enviaría el JSON al procedimiento SQL. SSAS Tabular expondría las cifras por fecha y territorio. La demora media nacional se cargaría como un indicador oficial de ámbito nacional. Power BI mostraría los indicadores vigentes y SSRS generaría un informe paginado de revisiones y rechazos. Power BI Report Server alojaría ambos informes. Estas integraciones están planteadas como diseño de implantación.
+SSIS recogería los CSV, ejecutaría el validador y enviaría el JSON al procedimiento SQL. SSAS Tabular expondría las cifras por fecha y territorio. La demora media nacional se cargaría como un indicador oficial de ámbito nacional. Power BI mostraría los indicadores vigentes y SSRS generaría un informe paginado de revisiones y rechazos. Power BI Report Server alojaría ambos informes.
+
+<img width="700" alt="Arquitectura de implantación propuesta" src="https://github.com/user-attachments/assets/52808394-d383-430e-b7e2-5519bf74d66e" />
+
+C#/.NET y SQL Server ejecutados y verificados. La integración con SSIS, SSAS, Power BI, SSRS y Power BI Report Server forma parte del diseño de implantación propuesto.
 
 
 ## Prueba repetible en Windows
